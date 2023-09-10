@@ -1,9 +1,9 @@
-# Configuration
-$backupPathsFile = "C:\Users\A474126\OneDrive - Atos\Work\Backup Monitor\BackupPaths.config"
-$minBackupSets = 5
-$emailSender = "backup-monitor@yourdomain.com"
-$notificationEmail = "your@email.com"
-$smtpServer = "smtp.yourmailserver.com"
+param
+(
+    [Parameter(Mandatory = $True)]
+    [ValidateNotNullOrEmpty()]
+    [string]$config
+)
 
 # Function to send an email report
 function Send-EmailReport {
@@ -61,17 +61,57 @@ function Get-Median {
     return $median
 }
 
-# Read backup paths from the file
-$backupPaths = Get-Content $backupPathsFile
+# Read config file
+if (Test-Path $config) {
+    $configFileContents = Get-Content $config | ForEach-Object {
+        $_.Trim()
+    }
+
+    # Define default values
+    $minBackupSets = 5
+    $emailSender = "backup-monitor@yourdomain.com"
+    $notificationEmail = "your@email.com"
+    $smtpServer = "smtp.yourmailserver.com"
+    $backupPaths = @()
+
+    foreach ($line in $configFileContents) {
+        if ($line -match "^\s*(\w+)\s*=\s*(.+)") {
+            $variableName = $matches[1]
+            $variableValue = $matches[2]
+            
+            # Set the variable based on the name
+            Set-Variable -Name $variableName -Value $variableValue
+        }
+        elseif (Test-Path $line -PathType Container) {
+            # If the line is a valid path, add it to the paths array
+            $backupPaths += $line
+        }
+    }
+
+    # Display the read or default values
+    Write-Host "Backup monitor started. These values where read from the config file. If not specified a default value was used."    
+    Write-Host "minBackupSets: $minBackupSets"
+    Write-Host "emailSender: $emailSender"
+    Write-Host "notificationEmail: $notificationEmail"
+    Write-Host "smtpServer: $smtpServer"
+    Write-Host "Paths:"
+    $backupPaths | ForEach-Object {
+        Write-Host $_
+    }
+}
+else {
+    Write-Host "Specified config file \"$config\" does not exist."
+    exit 1
+}
 
 # Initialize variables for tracking backups
-$failedBackups = @{}
+$failedBackups = @()
 $currentDate = Get-Date
 
 # Loop through each backup path
 foreach ($path in $backupPaths) {
     if (Test-Path $path) {
-        Write-Host "Checking path: " + $path.FullName
+        Write-Host "Checking path: ${path}"
 
         # Get a list of backup files and directories sorted by create time
         $backupItems = Get-ChildItem -Path $path | Sort-Object CreationTime
@@ -81,15 +121,18 @@ foreach ($path in $backupPaths) {
             # If there is a backup that is not older than 25 hours it's probably a fresh start and ignore
             if ($backupItems.Count -gt 0) {
                 if (($currentDate - $backupItems[-1].CreationTime).TotalSeconds -ge 90000) {                    
-                    $failedBackups[$path] = "Less than $minBackupSets backup sets found."
+                    $failedBackups += "${path}: Less than $minBackupSets backup sets found."
                     continue
                 }
                 else {
-                    Write-Host $path.FullName + ": less than $minBackupSets found, but ignoring as last backup is from within 25 hours"
+                    Write-Host "${path}: less than $minBackupSets found, but ignoring as last backup is from within 25 hours"
+                    continue
                 }
             }
-            $failedBackups[$path] = "Less than $minBackupSets backup sets found."
-            continue          
+            else {
+                $failedBackups += "${path}: Less than $minBackupSets backup sets found."
+                continue          
+            }
         }
 
         # Determine the pattern frequency based on timestamps 
@@ -108,8 +151,7 @@ foreach ($path in $backupPaths) {
         # Define the allowable discrepancy (5%)
         $allowableDiscrepancy = $medianDateDiff * 1.05
         if ($differenceToCheck -gt $allowableDiscrepancy) {
-            $failedBackups[$path] = "More time than usual has passed since the last backup. Please check"
-            # continue Zum Testen auskommentiert
+            $failedBackups += "${path}: More time than usual has passed since the last backup."
         }
 
         # Check if the latest backup size is reasonable based on previous backups
@@ -124,13 +166,11 @@ foreach ($path in $backupPaths) {
         # Define the allowable discrepancy (5%)
         $allowableDiscrepancy = $medianSize * 0.05
         if ($lastBackupSize -lt $allowableDiscrepancy) {
-            $failedBackups[$path] = "Last backup is more than 5% smaller than usual based on the previous backups. Please check"
-        }
-
-        
+            $failedBackups += "${path}: Last backup is more than 5% smaller than usual based on the previous backups."
+        }       
     }
     else {
-        $failedBackups[$path] = "Path not found."
+        $failedBackups += "${path}: Path not found."
     }
 }
 
@@ -143,16 +183,16 @@ foreach ($path in $backupPaths) {
     $reportBody += "$path`n"
 }
 
-$reportBody += "`nBACKUP ALARMS:`n"
+$reportBody += "`nALARMS:`n"
 if ($failedBackups.Count -eq 0) {
     $reportBody += "No failed backups`n"
 }
 else {
-    foreach ($failedBackup in $failedBackups.Keys) {
-        $reportBody += "$failedBackup\: $($failedBackups[$failedBackup])`n"
+    foreach ($failedBackup in $failedBackups) {
+        $reportBody += "$failedBackup`n"
     }
 }
 
 # Send the summary report via email
 #Send-EmailReport -subject "Backup Monitor Summary" -body $reportBody
-Write-Host $reportBody
+Write-Host "`n$reportBody"
