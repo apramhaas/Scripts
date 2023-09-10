@@ -72,7 +72,7 @@ $currentDate = Get-Date
 foreach ($path in $backupPaths) {
     if (Test-Path $path) {
         Write-Host "Checking path: " + $path.FullName
-        
+
         # Get a list of backup files and directories sorted by create time
         $backupItems = Get-ChildItem -Path $path | Sort-Object CreationTime
 
@@ -80,10 +80,12 @@ foreach ($path in $backupPaths) {
         if ($backupItems.Count -lt $minBackupSets) {
             # If there is a backup that is not older than 25 hours it's probably a fresh start and ignore
             if ($backupItems.Count -gt 0) {
-                if (($currentDate - $backupItems[-1].CreationTime).TotalSeconds -ge 90000)
-                {
+                if (($currentDate - $backupItems[-1].CreationTime).TotalSeconds -ge 90000) {                    
                     $failedBackups[$path] = "Less than $minBackupSets backup sets found."
                     continue
+                }
+                else {
+                    Write-Host $path.FullName + ": less than $minBackupSets found, but ignoring as last backup is from within 25 hours"
                 }
             }
             $failedBackups[$path] = "Less than $minBackupSets backup sets found."
@@ -112,7 +114,7 @@ foreach ($path in $backupPaths) {
 
         # Check if the latest backup size is reasonable based on previous backups
         $backupSizes = @()
-        for ($i = 0; $i -lt ($backupItems.Count -1); $i++) {
+        for ($i = 0; $i -lt ($backupItems.Count - 1); $i++) {
             $backupSizes += Get-BackupSize $backupItems[$i].FullName
         }
 
@@ -121,8 +123,7 @@ foreach ($path in $backupPaths) {
         $lastBackupSize = Get-BackupSize $backupItems[-1].FullName
         # Define the allowable discrepancy (5%)
         $allowableDiscrepancy = $medianSize * 0.05
-        if ($lastBackupSize -lt $allowableDiscrepancy)
-        {
+        if ($lastBackupSize -lt $allowableDiscrepancy) {
             $failedBackups[$path] = "Last backup is more than 5% smaller than usual based on the previous backups. Please check"
         }
 
