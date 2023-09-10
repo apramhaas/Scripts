@@ -71,13 +71,23 @@ $currentDate = Get-Date
 # Loop through each backup path
 foreach ($path in $backupPaths) {
     if (Test-Path $path) {
+        Write-Host "Checking path: " + $path.FullName
+        
         # Get a list of backup files and directories sorted by create time
         $backupItems = Get-ChildItem -Path $path | Sort-Object CreationTime
 
         # Ensure a minimum of $minBackupSets backup sets
         if ($backupItems.Count -lt $minBackupSets) {
+            # If there is a backup that is not older than 25 hours it's probably a fresh start and ignore
+            if ($backupItems.Count -gt 0) {
+                if (($currentDate - $backupItems[-1].CreationTime).TotalSeconds -ge 90000)
+                {
+                    $failedBackups[$path] = "Less than $minBackupSets backup sets found."
+                    continue
+                }
+            }
             $failedBackups[$path] = "Less than $minBackupSets backup sets found."
-            continue
+            continue          
         }
 
         # Determine the pattern frequency based on timestamps 
