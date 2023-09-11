@@ -108,6 +108,7 @@ else {
 $failedBackups = @()
 $currentDate = Get-Date
 
+Write-Host "Start backup check at $currentDate"
 # Loop through each backup path
 foreach ($path in $backupPaths) {
     if (Test-Path $path) {
@@ -194,5 +195,14 @@ else {
 }
 
 # Send the summary report via email
-#Send-EmailReport -subject "Backup Monitor Summary" -body $reportBody
+if ($notificationEmail -ne "your@email.com" -And $smtpServer -ne "smtp.yourmailserver.com") {
+    Write-Host "Send e-mail with summary to $notificationEmail"
+    if ($failedBackups.Count -eq 0) {
+        Send-EmailReport -subject "Backup monitor summary" -body $reportBody
+    }
+    else {
+        Send-EmailReport -subject "Backup monitor summary with ALARMs" -body $reportBody
+    }
+}
+
 Write-Host "`n$reportBody"
