@@ -71,6 +71,8 @@ if (Test-Path $config) {
     $minBackupSets = 5
     $emailSender = "backup-monitor@yourdomain.com"
     $notificationEmail = "your@email.com"
+    # Control if a mail is sent. Valid values: off, alarm, always
+    $notifyType = "off"
     $smtpServer = "smtp.yourmailserver.com"
     $backupPaths = @()
 
@@ -94,6 +96,7 @@ if (Test-Path $config) {
     Write-Host "emailSender: $emailSender"
     Write-Host "notificationEmail: $notificationEmail"
     Write-Host "smtpServer: $smtpServer"
+    Write-Host "notifyType: $notifyType"
     Write-Host "Paths:"
     $backupPaths | ForEach-Object {
         Write-Host $_
@@ -123,7 +126,7 @@ foreach ($path in $backupPaths) {
             if ($backupItems.Count -gt 0) {
                 if (($currentDate - $backupItems[-1].CreationTime).TotalSeconds -ge 90000) {                    
                     $failedBackups += "${path}: Less than $minBackupSets backup sets found."
-                    continue
+                    continue                    
                 }
                 else {
                     Write-Host "${path}: less than $minBackupSets found, but ignoring as last backup is from within 25 hours"
@@ -176,8 +179,8 @@ foreach ($path in $backupPaths) {
 }
 
 # Generate a summary report
-$reportBody = "Backup monitor summary report - $currentDate`n"
-$reportBody += "==========================================================`n"
+$reportBody = "Backup monitor summary report - ${currentDate}`n"
+$reportBody += "===============================================`n"
 
 $reportBody += "Checked backup paths:`n"
 foreach ($path in $backupPaths) {
@@ -195,12 +198,12 @@ else {
 }
 
 # Send the summary report via email
-if ($notificationEmail -ne "your@email.com" -And $smtpServer -ne "smtp.yourmailserver.com") {
+if ($notificationEmail -ne "your@email.com" -And $smtpServer -ne "smtp.yourmailserver.com" -And $notifyType -ne "off") {
     Write-Host "Send e-mail with summary to $notificationEmail"
-    if ($failedBackups.Count -eq 0) {
+    if ($failedBackups.Count -eq 0 -And $notifyType -eq "always") {
         Send-EmailReport -subject "Backup monitor summary" -body $reportBody
     }
-    else {
+    if ($failedBackups.Count -gt 0 -And $notifyType -eq "alarm") {
         Send-EmailReport -subject "Backup monitor summary with ALARMs" -body $reportBody
     }
 }
