@@ -155,7 +155,7 @@ foreach ($path in $backupPaths) {
         # Define the allowable discrepancy (5%)
         $allowableDiscrepancy = $medianDateDiff * 1.05
         if ($differenceToCheck -gt $allowableDiscrepancy) {
-            $failedBackups += "${path}: More time than usual has passed since the last backup."
+            $failedBackups += "${path}: More time than usual has passed since the last backup (calculated based on creation time)."
         }
 
         # Check if the latest backup size is reasonable based on previous backups
