@@ -150,12 +150,31 @@ foreach ($path in $backupPaths) {
         # Calculate the median of the differences
         $medianDateDiff = Get-Median -numbers $differences
 
-        # Check if the difference between the last backup timestamp and now is below the calculated median with a 5% discrepancy allowed        
+        # Check if the difference between the last backup timestamp and now is below the calculated median with a 5 % discrepancy allowed        
         $differenceToCheck = ($currentDate - $backupItems[-1].CreationTime).TotalSeconds
-        # Define the allowable discrepancy (5%)
+        # Define the allowable discrepancy (5 %)
         $allowableDiscrepancy = $medianDateDiff * 1.05
         if ($differenceToCheck -gt $allowableDiscrepancy) {
             $failedBackups += "${path}: More time than usual has passed since the last backup (calculated based on creation time)."
+        }
+
+        # Check if there are irregularities between the backup creation times
+        # loop through the differences array and detect if there is a discrepancy > 5 %
+        $exitloop = $False;
+        if ($differences.Length -ge 2) {
+            for ($i = 0; $i -lt ($differences.Length - 1); $i++) {
+                for ($j = $i + 1; $j -lt $differences.Length; $j++) {
+                    if ($differences[$i] -ne 0) {                    
+                        $discrepancy = ([Math]::Round((([Math]::Abs($differences[$i] - $differences[$j])) / $differences[$i]) * 100))
+                        if ($discrepancy -gt 5) {
+                            $failedBackups += "${path}: Detected a discrepancy greater than 5 % ($discrepancy) between the backup set creation times."
+                            $exitloop = $True;
+                        }
+                    }
+                    if ($exitloop) { break }
+                }
+                if ($exitloop) { break }
+            }
         }
 
         # Check if the latest backup size is reasonable based on previous backups
@@ -175,7 +194,7 @@ foreach ($path in $backupPaths) {
     }
     else {
         $failedBackups += "${path}: Path not found."
-    }
+    } 
 }
 
 # Generate a summary report
