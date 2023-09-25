@@ -118,13 +118,13 @@ foreach ($path in $backupPaths) {
         Write-Host "Checking path: ${path}"
 
         # Get a list of backup files and directories sorted by create time
-        $backupItems = Get-ChildItem -Path $path | Sort-Object CreationTime
+        $backupItems = Get-ChildItem -Path $path | Sort-Object LastWriteTime
 
         # Ensure a minimum of $minBackupSets backup sets
         if ($backupItems.Count -lt $minBackupSets) {
             # If there is a backup that is not older than 25 hours it's probably a fresh start and ignore
             if ($backupItems.Count -gt 0) {
-                if (($currentDate - $backupItems[-1].CreationTime).TotalSeconds -ge 90000) {                    
+                if (($currentDate - $backupItems[-1].LastWriteTime).TotalSeconds -ge 90000) {                    
                     $failedBackups += "${path}: Less than $minBackupSets backup sets found."
                     continue                    
                 }
@@ -143,7 +143,7 @@ foreach ($path in $backupPaths) {
         # Calculate the differences between timestamps
         $differences = @()
         for ($i = 0; $i -lt ($backupItems.Count - 1); $i++) {
-            $diff = ($backupItems[$i + 1].CreationTime - $backupItems[$i].CreationTime).TotalSeconds
+            $diff = ($backupItems[$i + 1].LastWriteTime - $backupItems[$i].LastWriteTime).TotalSeconds
             $differences += $diff
         }
         
@@ -151,7 +151,7 @@ foreach ($path in $backupPaths) {
         $medianDateDiff = Get-Median -numbers $differences
 
         # Check if the difference between the last backup timestamp and now is below the calculated median with a 5 % discrepancy allowed        
-        $differenceToCheck = ($currentDate - $backupItems[-1].CreationTime).TotalSeconds
+        $differenceToCheck = ($currentDate - $backupItems[-1].LastWriteTime).TotalSeconds
         # Define the allowable discrepancy (5 %)
         $allowableDiscrepancy = $medianDateDiff * 1.05
         if ($differenceToCheck -gt $allowableDiscrepancy) {
