@@ -73,13 +73,14 @@ if (Test-Path $config) {
     $minBackupSets = 5
     $emailSender = "backup-monitor@yourdomain.com"
     $notificationEmail = "your@email.com"
-    # Control if a mail is sent. Valid values: off, alarm, always
+    # Control if a mail is sent. Valid values for notifyType: off, alarm, always, alarmonlastbackup
     $notifyType = "off"
     $smtpServer = "smtp.yourmailserver.com"
     $backupPaths = @()
+    $alarmOnLastBackup = $False
 
     foreach ($line in $configFileContents) {
-        if ($line -eq $null) {
+        if ($line -eq "") {
             continue
         }
         if ($line -match "^\s*(\w+)\s*=\s*(.+)") {
@@ -134,9 +135,10 @@ foreach ($path in $backupPaths) {
         if ($backupItems.Count -lt $minBackupSets) {
             # If there is a backup that is not older than 25 hours it's probably a fresh start and ignore
             if ($backupItems.Count -gt 0) {
-                if (($currentDate - $backupItems[-1].LastWriteTime).TotalSeconds -ge 90000) {                    
+                if (($currentDate - $backupItems[-1].LastWriteTime).TotalSeconds -ge 90000) {
                     $failedBackups += "${path}: Less than $minBackupSets backup sets found."
-                    continue                    
+                    $alarmOnLastBackup = $True
+                    continue
                 }
                 else {
                     Write-Host "${path}: less than $minBackupSets found, but ignoring as last backup is from within 25 hours"
@@ -145,7 +147,8 @@ foreach ($path in $backupPaths) {
             }
             else {
                 $failedBackups += "${path}: Less than $minBackupSets backup sets found."
-                continue          
+                $alarmOnLastBackup = $True
+                continue
             }
         }
 
@@ -155,11 +158,11 @@ foreach ($path in $backupPaths) {
         for ($i = 0; $i -lt ($backupItems.Count - 1); $i++) {
             $diff = ($backupItems[$i + 1].LastWriteTime - $backupItems[$i].LastWriteTime).TotalSeconds
             $differences += $diff
-            if ($debug -eq $True) {
+            if ($debug) {
                 $diff1 = $backupItems[$i + 1].LastWriteTime
                 $diff2 = $backupItems[$i].LastWriteTime
                 Write-Host "diff1 = $diff1, diff2 = $diff2, diff = $diff"
-            }            
+            }
         }
         
         # Calculate the median of the differences
@@ -172,6 +175,7 @@ foreach ($path in $backupPaths) {
         $allowableDiscrepancy = $medianDateDiff * 1.05
         if ($differenceToCheck -gt $allowableDiscrepancy) {
             $failedBackups += "${path}: More time than usual has passed since the last backup (calculated based on modification time)."
+            $alarmOnLastBackup = $True
         }
 
         # Check if there are irregularities between the backup creation times
@@ -193,6 +197,10 @@ foreach ($path in $backupPaths) {
                         $leaf2 = Split-Path -Path $backupItems[$i + 1] -Leaf
                         $leaf3 = Split-Path -Path $backupItems[$i + 2] -Leaf
                         $failedBackups += "${path}: Detected a discrepancy greater than 5 % ($discrepancy % - $leaf1 and $leaf2 and $leaf3) between the backup set modification times."
+                        # check if the alarm occured on the last backup an enable the flag for mail delivery
+                        if ($i -eq ($differences.Length - 2)) {
+                            $alarmOnLastBackup = $True
+                        }
                         $exitloop = $True;
                     }
                 }
@@ -246,9 +254,13 @@ if ($notificationEmail -ne "your@email.com" -And $smtpServer -ne "smtp.yourmails
     if ($failedBackups.Count -eq 0 -And $notifyType -eq "always") {
         Send-EmailReport -subject "Backup monitor summary" -body $reportBody
     }
-    if ($failedBackups.Count -gt 0 -And $notifyType -eq "alarm") {
+    elseif ($failedBackups.Count -gt 0 -And $notifyType -eq "alarm") {
         Send-EmailReport -subject "Backup monitor summary with ALARMs" -body $reportBody
     }
+    elseif ($failedBackups.Count -gt 0 -And $notifyType -eq "alarmonlastbackup" -and $alarmOnLastBackup -eq $True){
+        Send-EmailReport -subject "Backup monitor summary with ALARMs" -body $reportBody
+    }
+
 }
 
 Write-Host "`n$reportBody"
