@@ -178,19 +178,25 @@ foreach ($path in $backupPaths) {
         # loop through the differences array and detect if there is a discrepancy > 5 %
         $exitloop = $False;
         if ($differences.Length -ge 2) {
-            for ($i = 0; $i -lt ($differences.Length - 1); $i++) {
-                for ($j = $i + 1; $j -lt $differences.Length; $j++) {
-                    if ($differences[$i] -ne 0) {                    
-                        $discrepancy = ([Math]::Round((([Math]::Abs($differences[$i] - $differences[$j])) / $differences[$i]) * 100))
-                        if ($discrepancy -gt 5) {
-                            $leaf1 = Split-Path -Path $backupItems[$i] -Leaf
-                            $leaf2 = Split-Path -Path $backupItems[$i + 1] -Leaf
-                            $failedBackups += "${path}: Detected a discrepancy greater than 5 % ($discrepancy % - $leaf1 and $leaf2) between the backup set modification times."
-                            $exitloop = $True;
-                        }
+            for ($i = 0; $i -lt ($differences.Length - 1); $i++) {                
+                if ($differences[$i] -ne 0) {                    
+                    $discrepancy = ([Math]::Round((([Math]::Abs($differences[$i] - $differences[$i + 1])) / $differences[$i]) * 100))
+                    if ($debug){
+                        $leaf1 = Split-Path -Path $backupItems[$i] -Leaf
+                        $leaf2 = Split-Path -Path $backupItems[$i + 1] -Leaf
+                        $leaf3 = Split-Path -Path $backupItems[$i + 2] -Leaf
+                        Write-Host "leaf1 = $leaf1, leaf2 = $leaf2, leaf3 = $leaf3, discrepancy = $discrepancy (of differences between leaf1/leaf2 and leaf2/leaf3)"
                     }
-                    if ($exitloop) { break }
+
+                    if ($discrepancy -gt 5) {
+                        $leaf1 = Split-Path -Path $backupItems[$i] -Leaf
+                        $leaf2 = Split-Path -Path $backupItems[$i + 1] -Leaf
+                        $leaf3 = Split-Path -Path $backupItems[$i + 2] -Leaf
+                        $failedBackups += "${path}: Detected a discrepancy greater than 5 % ($discrepancy % - $leaf1 and $leaf2 and $leaf3) between the backup set modification times."
+                        $exitloop = $True;
+                    }
                 }
+                if ($exitloop) { break }
                 if ($exitloop) { break }
             }
         }
