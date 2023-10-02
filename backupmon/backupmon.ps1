@@ -5,6 +5,8 @@ param
     [string]$config
 )
 
+$debug = $False
+
 # Function to send an email report
 function Send-EmailReport {
     param (
@@ -85,7 +87,12 @@ if (Test-Path $config) {
             $variableValue = $matches[2]
             
             # Set the variable based on the name
-            Set-Variable -Name $variableName -Value $variableValue
+            if ($variableName -eq "debug" -and $variableValue -eq "true"){
+                $debug = $True
+            }
+            else{
+                Set-Variable -Name $variableName -Value $variableValue
+            }            
         }
         # If the line is a valid path, add it to the paths array
         elseif (Test-Path $line -PathType Container) {
@@ -114,7 +121,7 @@ else {
 $failedBackups = @()
 $currentDate = Get-Date
 
-Write-Host "Start backup check at $currentDate"
+Write-Host "`nStart backup check at $currentDate"
 # Loop through each backup path
 foreach ($path in $backupPaths) {
     if (Test-Path $path) {
@@ -148,17 +155,23 @@ foreach ($path in $backupPaths) {
         for ($i = 0; $i -lt ($backupItems.Count - 1); $i++) {
             $diff = ($backupItems[$i + 1].LastWriteTime - $backupItems[$i].LastWriteTime).TotalSeconds
             $differences += $diff
+            if ($debug -eq $True) {
+                $diff1 = $backupItems[$i + 1].LastWriteTime
+                $diff2 = $backupItems[$i].LastWriteTime
+                Write-Host "diff1 = $diff1, diff2 = $diff2, diff = $diff"
+            }            
         }
         
         # Calculate the median of the differences
         $medianDateDiff = Get-Median -numbers $differences
+        Write-Host "${path}: Calculated median of time span between the backups sets is ${medianDateDiff} seconds"
 
         # Check if the difference between the last backup timestamp and now is below the calculated median with a 5 % discrepancy allowed        
         $differenceToCheck = ($currentDate - $backupItems[-1].LastWriteTime).TotalSeconds
         # Define the allowable discrepancy (5 %)
         $allowableDiscrepancy = $medianDateDiff * 1.05
         if ($differenceToCheck -gt $allowableDiscrepancy) {
-            $failedBackups += "${path}: More time than usual has passed since the last backup (calculated based on creation time)."
+            $failedBackups += "${path}: More time than usual has passed since the last backup (calculated based on modification time)."
         }
 
         # Check if there are irregularities between the backup creation times
@@ -170,7 +183,9 @@ foreach ($path in $backupPaths) {
                     if ($differences[$i] -ne 0) {                    
                         $discrepancy = ([Math]::Round((([Math]::Abs($differences[$i] - $differences[$j])) / $differences[$i]) * 100))
                         if ($discrepancy -gt 5) {
-                            $failedBackups += "${path}: Detected a discrepancy greater than 5 % ($discrepancy) between the backup set creation times."
+                            $leaf1 = Split-Path -Path $backupItems[$i] -Leaf
+                            $leaf2 = Split-Path -Path $backupItems[$i + 1] -Leaf
+                            $failedBackups += "${path}: Detected a discrepancy greater than 5 % ($discrepancy % - $leaf1 and $leaf2) between the backup set modification times."
                             $exitloop = $True;
                         }
                     }
