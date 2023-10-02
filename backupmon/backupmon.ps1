@@ -88,10 +88,10 @@ if (Test-Path $config) {
             $variableValue = $matches[2]
             
             # Set the variable based on the name
-            if ($variableName -eq "debug" -and $variableValue -eq "true"){
+            if ($variableName -eq "debug" -and $variableValue -eq "true") {
                 $debug = $True
             }
-            else{
+            else {
                 Set-Variable -Name $variableName -Value $variableValue
             }            
         }
@@ -185,7 +185,7 @@ foreach ($path in $backupPaths) {
             for ($i = 0; $i -lt ($differences.Length - 1); $i++) {                
                 if ($differences[$i] -ne 0) {                    
                     $discrepancy = ([Math]::Round((([Math]::Abs($differences[$i] - $differences[$i + 1])) / $differences[$i]) * 100))
-                    if ($debug){
+                    if ($debug) {
                         $leaf1 = Split-Path -Path $backupItems[$i] -Leaf
                         $leaf2 = Split-Path -Path $backupItems[$i + 1] -Leaf
                         $leaf3 = Split-Path -Path $backupItems[$i + 2] -Leaf
@@ -196,7 +196,7 @@ foreach ($path in $backupPaths) {
                         $leaf1 = Split-Path -Path $backupItems[$i] -Leaf
                         $leaf2 = Split-Path -Path $backupItems[$i + 1] -Leaf
                         $leaf3 = Split-Path -Path $backupItems[$i + 2] -Leaf
-                        $failedBackups += "${path}: Detected a discrepancy greater than 5 % ($discrepancy % - $leaf1 and $leaf2 and $leaf3) between the backup set modification times."
+                        $failedBackups += "${path}: Detected a discrepancy greater than 5 % ($discrepancy % - $leaf1 / $leaf2 / $leaf3) between the backup set modification times."
                         # check if the alarm occured on the last backup an enable the flag for mail delivery
                         if ($i -eq ($differences.Length - 2)) {
                             $alarmOnLastBackup = $True
@@ -257,7 +257,7 @@ if ($notificationEmail -ne "your@email.com" -And $smtpServer -ne "smtp.yourmails
     elseif ($failedBackups.Count -gt 0 -And $notifyType -eq "alarm") {
         Send-EmailReport -subject "Backup monitor summary with ALARMs" -body $reportBody
     }
-    elseif ($failedBackups.Count -gt 0 -And $notifyType -eq "alarmonlastbackup" -and $alarmOnLastBackup -eq $True){
+    elseif ($failedBackups.Count -gt 0 -And $notifyType -eq "alarmonlastbackup" -and $alarmOnLastBackup -eq $True) {
         Send-EmailReport -subject "Backup monitor summary with ALARMs" -body $reportBody
     }
 
