@@ -77,6 +77,9 @@ if (Test-Path $config) {
     $backupPaths = @()
 
     foreach ($line in $configFileContents) {
+        if ($line -eq $null) {
+            continue
+        }
         if ($line -match "^\s*(\w+)\s*=\s*(.+)") {
             $variableName = $matches[1]
             $variableValue = $matches[2]
@@ -84,9 +87,9 @@ if (Test-Path $config) {
             # Set the variable based on the name
             Set-Variable -Name $variableName -Value $variableValue
         }
+        # If the line is a valid path, add it to the paths array
         elseif (Test-Path $line -PathType Container) {
-            # If the line is a valid path, add it to the paths array
-            $backupPaths += $line
+            $backupPaths += $line                     
         }
     }
 
