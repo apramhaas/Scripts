@@ -1,21 +1,24 @@
 #!/bin/bash
 
 ################################################################################
-# Customer:       ***
-# Author:         Andreas Pramhaas
-#                 https://github.com/apramhaas/Scripts
+# Customer/System: ***
+# Author:          Andreas Pramhaas
+#                  https://github.com/apramhaas/Scripts
 # 
 # Custom settings for OSV
 # Place this script in /repository/upload on both nodes and call after toolkit
 # upgrade has finished to reapply the settings specific for this customer.
 # Call on one node with "bash postToolkitCustomization.sh" and it will be 
 # executed on the other node as well.
+# Variable NODE1 and NODE2 can be set to the hostnames of the OSV nodes.
+# If the system is a Simplex system, NODE2 should be empty.
 # 
 # History
 # 2025-01-08 Initial version
 # 2025-03-20 Optimize password aging handling
 #            Better an more status messages
 #            added SSH key import example
+# 2025-06-05 Add support for Simplex systems
 ################################################################################
 
 # Configurable hostnames
@@ -52,6 +55,7 @@ run_on_node() {
 systemusers=("superad" "sysad" "dbad" "secad" "sym" "root" "solid" "cdr" "webad" "srx")
 for user in "${systemusers[@]}"; do
   chage -m 0 -M 9998 -I -1 -E -1 "$user"
+  echo "Password policy for $user set: min=0, max=9998, inactive=-1, expire=-1"
 done
 # additional accounts
 # do not set password aging to 'never' as this triggers a OSV password
@@ -59,8 +63,12 @@ done
 future_date=$(date -d "+3 years" +%Y-%m-%d)
 if id "osccesync" &>/dev/null; then  
   chage -m 0 -M 3650 -I -1 -E "$future_date" -W 30 osccesync
+  echo "Password policy for osccesync set: min=0, max=3650, inactive=-1, expire=$future_date, warn=30"
 fi
-chage -m 0 -M 3650 -I -1 -E "$future_date" -W 30 osfaultmgr
+if id "osfaultmgr" &>/dev/null; then  
+  chage -m 0 -M 3650 -I -1 -E "$future_date" -W 30 osfaultmgr
+  echo "Password policy for osfaultmgr set: min=0, max=3650, inactive=-1, expire=$future_date, warn=30"
+fi
 
 # Uncomment to add SSH keys for authentication.
 # Example given for the sysad account
@@ -110,7 +118,11 @@ echo "$(hostname): The script has been executed on this node."
 
 # Run the script on the other node
 if [ "$(hostname)" == "$NODE1" ]; then
-  run_on_node "$NODE2"
+  if [ -n "$NODE2" ]; then
+    run_on_node "$NODE2"
+  else
+    echo "$(hostname): NODE2 variable is empty - probably a Simplex system. Not running on other node."
+  fi
 elif [ "$(hostname)" == "$NODE2" ]; then
   run_on_node "$NODE1"
 else
