@@ -22,7 +22,12 @@
     Version History:
     ----------------   
     V1.0 (30. Aug 2023)
-        Initial version  
+        Initial version
+    V1.1 (28. Jan 2026)
+        Add -UseBasicParsing for Invoke-WebRequest for better compatibility with older PowerShell versions
+        Added error handling with exit codes
+        Console output for exception messages on error
+        Success message on backup completion
 #>
 param
 (
@@ -79,7 +84,7 @@ public static class Dummy {
 try 
 {
     # Create a web request with basic authentication
-    $request = Invoke-WebRequest -Uri $url -Method Get -Headers @{ 'Authorization' = 'Basic ' + $credentials} -ErrorVariable webError -ErrorAction Stop
+    $request = Invoke-WebRequest -Uri $url -Method Get -Headers @{ 'Authorization' = 'Basic ' + $credentials} -UseBasicParsing -ErrorVariable webError -ErrorAction Stop
 
     # Check if the request was successful
     if ($request.StatusCode -eq 200)
@@ -94,14 +99,18 @@ try
         {            
             $filesToDelete[-$excessFileCount..-1] | ForEach-Object {Remove-Item $_.FullName -Force}
         }
+        Write-Host "Backup successfully saved to: $fullPath"
+        exit 0
     } 
     else 
     {
         Write-Host "Backup has failed with an error status of $($request.StatusCode)"
         Write-Host "Error description: $($webError.Exception.Message)"
+        exit 1
     }
 }
 catch 
 {
     Write-Host "An error occurred during the backup process: $_"
+    exit 1
 }
