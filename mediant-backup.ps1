@@ -17,7 +17,7 @@
 .EXAMPLE
     .\mediant-backup.ps1 -hostname 10.0.0.1 -username Admin -password 'Admin' -backuppath 'D:\Backup\'
 .NOTES
-    Written by Andreas Pramhaas, andreas.pramhaas@atos.net
+    Written by Andreas Pramhaas, andreas.pramhaas@mitel.com
     
     Version History:
     ----------------   
