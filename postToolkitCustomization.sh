@@ -10,7 +10,8 @@
 # upgrade has finished to reapply the settings specific for this customer.
 # Call on one node with "bash postToolkitCustomization.sh" and it will be 
 # executed on the other node as well.
-# Variable NODE1 and NODE2 can be set to the hostnames of the OSV nodes.
+# Variable NODE1 and NODE2 need be set to the actual hostnames of the OSV nodes
+# that the script works correctly.
 # If the system is a Simplex system, NODE2 should be empty.
 # 
 # History
@@ -24,6 +25,8 @@
 # Configurable hostnames
 NODE1="osvoice1"
 NODE2="osvoice2"
+
+
 SCRIPT_PATH="/repository/upload/postToolkitCustomization.sh"
 FLAG_FILE="/tmp/osvCustomSettings_done"
 
@@ -57,9 +60,10 @@ for user in "${systemusers[@]}"; do
   chage -m 0 -M 9998 -I -1 -E -1 "$user"
   echo "Password policy for $user set: min=0, max=9998, inactive=-1, expire=-1"
 done
-# additional accounts
-# do not set password aging to 'never' as this triggers a OSV password
-# expiration alarm for non predefined system accounts
+
+# additional accounts that are not predefined but created during OSV installation and need to be handled as well
+# add other accounts as needed
+# do not set password aging to 'never' as this triggers a OSV password expiration alarm for non predefined system accounts
 future_date=$(date -d "+3 years" +%Y-%m-%d)
 if id "osccesync" &>/dev/null; then  
   chage -m 0 -M 3650 -I -1 -E "$future_date" -W 30 osccesync
@@ -93,6 +97,7 @@ fi
 #chown sysad:rtpgrp "$auth_file"
 ###
 
+# Enable SSH root login with password (if needed, not recommended for security reasons)
 # Modify /etc/ssh/sshd_config
 sshd_config="/etc/ssh/sshd_config"
 sed -i.bak -e "s/^\(PermitRootLogin\s\+\)without-password/#\1without-password/" \
@@ -116,7 +121,7 @@ rpm -e UNSPmigration
 touch "$FLAG_FILE"
 echo "$(hostname): The script has been executed on this node."
 
-# Run the script on the other node
+# Run the script on the other node in a cluster setup
 if [ "$(hostname)" == "$NODE1" ]; then
   if [ -n "$NODE2" ]; then
     run_on_node "$NODE2"
